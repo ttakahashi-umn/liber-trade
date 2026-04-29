@@ -1,0 +1,27 @@
+[project]
+name = "liber-trade-backend"
+version = "0.1.0"
+description = "PoC backend for trade document OCR to JSON."
+requires-python = ">=3.14"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn>=0.32.0",
+  "python-multipart>=0.0.12",
+  "pydantic>=2.10.0",
+  "httpx>=0.28.0",
+  "python-dotenv>=1.1.0",
+  "pillow>=11.0.0",
+  "pypdf>=5.0.0",
+  "openpyxl>=3.1.0",
+  "python-docx>=1.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "httpx>=0.28.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
