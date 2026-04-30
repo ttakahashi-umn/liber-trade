@@ -1,6 +1,7 @@
 from io import BytesIO
 
 from docx import Document
+from pypdf import PdfWriter
 
 from app.application.services.document_input_preprocessor import DocumentInputPreprocessor
 from app.application.services.text_correction_service import TextCorrectionService
@@ -52,3 +53,16 @@ def test_preprocessor_raises_value_error_for_invalid_pdf() -> None:
         assert False, "ValueError が発生するべき"
     except ValueError as exc:
         assert "PDF" in str(exc)
+
+
+def test_preprocessor_rasterizes_pdf() -> None:
+    preprocessor = DocumentInputPreprocessor()
+    writer = PdfWriter()
+    writer.add_blank_page(width=595, height=842)
+    buf = BytesIO()
+    writer.write(buf)
+
+    rendered, supplemental = preprocessor.preprocess(buf.getvalue(), "sample.pdf", "application/pdf")
+    assert isinstance(rendered, bytes)
+    assert len(rendered) > 0
+    assert isinstance(supplemental, str)

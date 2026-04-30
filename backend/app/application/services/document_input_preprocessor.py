@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 from docx import Document
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
+import pypdfium2 as pdfium
 
 
 class DocumentInputPreprocessor:
@@ -16,8 +17,9 @@ class DocumentInputPreprocessor:
         if file_kind == "image":
             return file_bytes, ""
         if file_kind == "pdf":
-            text = self._extract_pdf_text(file_bytes)
-            return self._render_text_to_image(text), text
+            image_bytes = self._rasterize_pdf_to_image(file_bytes)
+            supplemental_text = self._extract_pdf_text_best_effort(file_bytes)
+            return image_bytes, supplemental_text
         if file_kind == "excel":
             text = self._extract_excel_text(file_bytes)
             return self._render_text_to_image(text), text
@@ -47,17 +49,45 @@ class DocumentInputPreprocessor:
         return "unknown"
 
     @staticmethod
-    def _extract_pdf_text(file_bytes: bytes) -> str:
+    def _extract_pdf_text_best_effort(file_bytes: bytes) -> str:
         try:
             reader = PdfReader(BytesIO(file_bytes))
             texts = []
             for page in reader.pages[:5]:
                 texts.append(page.extract_text() or "")
             return "\n".join(texts).strip()
-        except PdfReadError as exc:
-            raise ValueError("PDFを読み取れません。暗号化または破損の可能性があります") from exc
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _rasterize_pdf_to_image(file_bytes: bytes) -> bytes:
+        try:
+            pdf = pdfium.PdfDocument(file_bytes)
+            max_pages = min(len(pdf), 3)
+            if max_pages == 0:
+                raise ValueError("PDFにページがありません")
+
+            images: list[Image.Image] = []
+            for page_index in range(max_pages):
+                page = pdf[page_index]
+                pil_image = page.render(scale=2.0).to_pil()
+                images.append(pil_image.convert("RGB"))
+
+            width = max(img.width for img in images)
+            height = sum(img.height for img in images)
+            canvas = Image.new("RGB", (width, height), color=(255, 255, 255))
+            cursor_y = 0
+            for img in images:
+                canvas.paste(img, (0, cursor_y))
+                cursor_y += img.height
+
+            buffer = BytesIO()
+            canvas.save(buffer, format="PNG")
+            return buffer.getvalue()
+        except (PdfReadError, pdfium.PdfiumError) as exc:
+            raise ValueError("PDFを画像化できません。暗号化または破損の可能性があります") from exc
         except Exception as exc:
-            raise ValueError("PDFの処理に失敗しました") from exc
+            raise ValueError("PDFの画像化に失敗しました") from exc
 
     @staticmethod
     def _extract_excel_text(file_bytes: bytes) -> str:

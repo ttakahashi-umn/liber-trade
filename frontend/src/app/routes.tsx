@@ -1,5 +1,22 @@
-import { useState } from "react";
-import { AppShell, Button, Container, Group, Paper, Stack, Text, Title } from "@mantine/core";
+import { useEffect, useState } from "react";
+import { IconFileUpload, IconListDetails } from "@tabler/icons-react";
+import {
+  ActionIcon,
+  Affix,
+  AppShell,
+  Burger,
+  Button,
+  Drawer,
+  Group,
+  Image,
+  NavLink,
+  Paper,
+  Stack,
+  Text,
+  ThemeIcon,
+  Tooltip,
+  Title,
+} from "@mantine/core";
 import { CaseListPanel } from "@/features/document-ingest/components/CaseListPanel";
 import { ResultPanel } from "@/features/document-ingest/components/ResultPanel";
 import { UploadForm } from "@/features/document-ingest/components/UploadForm";
@@ -8,56 +25,117 @@ import type { IngestResult } from "@/features/document-ingest/schema/resultViewM
 export function AppRoutes() {
   const [result, setResult] = useState<IngestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState<"upload" | "cases">("upload");
+  const [page, setPage] = useState<"cases">("cases");
+  const [menuOpened, setMenuOpened] = useState(true);
+  const [drawerOpened, setDrawerOpened] = useState(false);
+  const [uploadedPreview, setUploadedPreview] = useState<{ url: string; type: string; name: string } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (uploadedPreview?.url) URL.revokeObjectURL(uploadedPreview.url);
+    };
+  }, [uploadedPreview]);
 
   return (
-    <AppShell padding="md">
+    <AppShell
+      padding="md"
+      header={{ height: 72 }}
+      navbar={{ width: menuOpened ? 220 : 72, breakpoint: "sm", collapsed: { mobile: !menuOpened, desktop: !menuOpened } }}
+    >
+      <AppShell.Header>
+        <Group h="100%" px="md" justify="space-between">
+          <Group>
+            <Burger opened={menuOpened} onClick={() => setMenuOpened((v) => !v)} size="sm" />
+            <div>
+              <Title order={3}>Trade Document Ingest PoC</Title>
+              <Text size="xs" c="dimmed">
+                案件一覧中心のSPA
+              </Text>
+            </div>
+          </Group>
+        </Group>
+      </AppShell.Header>
+      <AppShell.Navbar p="sm">
+        <NavLink
+          label={menuOpened ? "案件一覧" : undefined}
+          description={menuOpened ? "Case List" : undefined}
+          active={page === "cases"}
+          onClick={() => setPage("cases")}
+          leftSection={
+            <ThemeIcon variant={page === "cases" ? "filled" : "light"} radius="xl" size={30}>
+              <IconListDetails size={18} />
+            </ThemeIcon>
+          }
+        />
+      </AppShell.Navbar>
       <AppShell.Main>
-        <Container size="lg">
+        <Stack gap="md">
+          <CaseListPanel processId={result?.process_id ?? null} />
+          <ResultPanel result={result} />
+        </Stack>
+
+        <Affix position={{ bottom: 28, right: 28 }}>
+          <Tooltip label="ドキュメントを取り込む" position="left">
+            <ActionIcon
+              size={56}
+              radius="xl"
+              variant="filled"
+              color="dark"
+              onClick={() => setDrawerOpened(true)}
+              aria-label="ドキュメント取り込み画面を開く"
+              style={{ border: "2px solid white", boxShadow: "0 8px 20px rgba(0,0,0,0.28)", fontSize: 24 }}
+            >
+              <IconFileUpload size={24} />
+            </ActionIcon>
+          </Tooltip>
+        </Affix>
+
+        <Drawer
+          opened={drawerOpened}
+          onClose={() => setDrawerOpened(false)}
+          position="right"
+          size="md"
+          title="書類取り込み"
+        >
           <Stack gap="md">
-            <Paper withBorder p="md" radius="md">
-              <Group justify="space-between" align="center">
-                <div>
-                  <Title order={2}>Trade Document Ingest PoC</Title>
-                  <Text size="sm" c="dimmed">
-                    書類取り込み、突合結果確認、案件一覧確認
-                  </Text>
-                </div>
-                <Group>
-                  <Button variant={page === "upload" ? "filled" : "light"} onClick={() => setPage("upload")}>
-                    取り込み
-                  </Button>
-                  <Button
-                    variant={page === "cases" ? "filled" : "light"}
-                    onClick={() => setPage("cases")}
-                    disabled={!result}
-                  >
-                    案件一覧
-                  </Button>
-                </Group>
-              </Group>
-            </Paper>
-
-            {page === "upload" && (
-              <UploadForm
-                onResult={(next) => {
-                  setError(null);
-                  setResult(next);
-                }}
-                onError={(message) => setError(message)}
-                onSuccessNavigate={() => setPage("cases")}
-              />
-            )}
-
+            <UploadForm
+              onResult={(next) => {
+                setError(null);
+                setResult(next);
+              }}
+              onError={(message) => setError(message)}
+              onUploadSuccess={(file) => {
+                if (uploadedPreview?.url) URL.revokeObjectURL(uploadedPreview.url);
+                setUploadedPreview({
+                  url: URL.createObjectURL(file),
+                  type: file.type || "",
+                  name: file.name,
+                });
+              }}
+            />
             {error && <Text c="red">{error}</Text>}
-
-            {page === "upload" ? (
-              <ResultPanel result={result} />
-            ) : (
-              <CaseListPanel processId={result?.process_id ?? null} />
+            {uploadedPreview && (
+              <Stack gap={6}>
+                <Text size="sm" fw={600}>
+                  取り込みプレビュー
+                </Text>
+                {uploadedPreview.type.startsWith("image/") ? (
+                  <Image src={uploadedPreview.url} alt="取り込み画像" radius="md" withPlaceholder />
+                ) : (
+                  <Paper withBorder p="sm" radius="md">
+                    <Text size="sm">画像プレビュー対象外のファイルです。</Text>
+                    <Text size="xs" c="dimmed">
+                      {uploadedPreview.name} ({uploadedPreview.type || "unknown"})
+                    </Text>
+                  </Paper>
+                )}
+              </Stack>
             )}
+            <Button variant="light" onClick={() => setDrawerOpened(false)}>
+              閉じる
+            </Button>
           </Stack>
-        </Container>
+        </Drawer>
       </AppShell.Main>
     </AppShell>
   );

@@ -6,10 +6,10 @@ import type { IngestResult } from "../schema/resultViewModel";
 type Props = {
   onResult: (result: IngestResult) => void;
   onError: (message: string) => void;
-  onSuccessNavigate: () => void;
+  onUploadSuccess: (file: File) => void;
 };
 
-export function UploadForm({ onResult, onError, onSuccessNavigate }: Props) {
+export function UploadForm({ onResult, onError, onUploadSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -24,7 +24,7 @@ export function UploadForm({ onResult, onError, onSuccessNavigate }: Props) {
     try {
       const result = await ingestDocument(file);
       onResult(result);
-      onSuccessNavigate();
+      onUploadSuccess(file);
     } catch (error) {
       onError(error instanceof Error ? error.message : "アップロードに失敗しました");
     } finally {
