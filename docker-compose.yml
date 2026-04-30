@@ -7,10 +7,18 @@ services:
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2-vision}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - MINIO_BUCKET_RAW=${MINIO_BUCKET_RAW:-trade-raw}
+      - MINIO_BUCKET_RENDERED=${MINIO_BUCKET_RENDERED:-trade-rendered}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-false}
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
+    depends_on:
+      - minio
 
   frontend:
     build:
@@ -25,5 +33,36 @@ services:
     ports:
       - "5173:5173"
 
+  minio:
+    image: minio/minio:latest
+    container_name: liber-trade-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: liber-trade-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do
+        sleep 1;
+      done;
+      mc mb -p local/${MINIO_BUCKET_RAW:-trade-raw} || true;
+      mc mb -p local/${MINIO_BUCKET_RENDERED:-trade-rendered} || true;
+      mc anonymous set private local/${MINIO_BUCKET_RAW:-trade-raw};
+      mc anonymous set private local/${MINIO_BUCKET_RENDERED:-trade-rendered};
+      exit 0;
+      "
+
 volumes:
   frontend_node_modules:
+  minio_data:

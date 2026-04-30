@@ -28,3 +28,34 @@ def test_consistency_checker_detects_mismatch() -> None:
     )
     assert result.is_consistent is False
     assert len(result.inconsistencies) >= 1
+
+
+def test_compare_documents_respects_tolerance() -> None:
+    checker = ConsistencyChecker()
+    result = checker.compare_documents(
+        chain_id="chain-1",
+        base_document_id="doc-po",
+        target_document_id="doc-inv",
+        base_payload={"line_items": [{"description": "Item A", "quantity": 100}]},
+        target_payload={"line_items": [{"description": "Item A", "quantity": 105}]},
+        quantity_tolerance_ratio=0.1,
+    )
+    assert result.result_status == "WARN"
+    assert len(result.items) == 1
+    assert result.items[0].is_acceptable is True
+
+
+def test_compare_documents_fails_without_tolerance() -> None:
+    checker = ConsistencyChecker()
+    result = checker.compare_documents(
+        chain_id="chain-1",
+        base_document_id="doc-po",
+        target_document_id="doc-inv",
+        base_payload={"line_items": [{"description": "Item A", "quantity": 100}]},
+        target_payload={"line_items": [{"description": "Item A", "quantity": 105}]},
+        quantity_tolerance_ratio=0.0,
+        quantity_rule_id="rule-po-inv-qty-v1",
+    )
+    assert result.result_status == "FAIL"
+    assert len(result.items) == 1
+    assert result.items[0].is_acceptable is False

@@ -9,6 +9,8 @@ export type Inconsistency = {
 
 export type IngestResult = {
   process_id: string;
+  raw_file_url: string | null;
+  rendered_image_url: string | null;
   status: ProcessStatus;
   normalized_payload: Record<string, unknown>;
   consistency_result: {
